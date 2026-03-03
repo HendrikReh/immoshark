@@ -65,7 +65,7 @@ export function Dashboard() {
           }}
         >
           <Input
-            placeholder="Schnellsuche nach Adresse, Ort, Beschreibung..."
+            placeholder="Suche nach ...?"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="flex-1"
