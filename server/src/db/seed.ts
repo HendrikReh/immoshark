@@ -27,6 +27,7 @@ const immobilien = [
     kontakt_email: "max@immoshark.de",
     expose_nummer: "IS-2024-001",
     notizen: "Besichtigung am 15.03. vereinbart. Käufer sehr interessiert.",
+    veroeffentlicht: "2026-01-15",
     status: "verfuegbar",
   },
   {
@@ -48,6 +49,7 @@ const immobilien = [
     kontakt_telefon: "+49 40 87654321",
     kontakt_email: "anna@immoshark.de",
     expose_nummer: "IS-2024-002",
+    veroeffentlicht: "2026-02-01",
     status: "verfuegbar",
   },
   {
@@ -69,6 +71,7 @@ const immobilien = [
     kontakt_telefon: "+49 30 11223344",
     kontakt_email: "thomas@immoshark.de",
     expose_nummer: "IS-2024-003",
+    veroeffentlicht: "2025-12-10",
     status: "reserviert",
   },
   {
@@ -141,12 +144,12 @@ const stmt = db.prepare(`
     strasse, hausnummer, plz, ort, preis, wohnflaeche, grundstuecksflaeche,
     zimmeranzahl, typ, baujahr, beschreibung, provision, energieausweis_klasse,
     energieausweis_verbrauch, kontakt_name, kontakt_telefon, kontakt_email,
-    expose_nummer, notizen, status
+    expose_nummer, notizen, veroeffentlicht, status
   ) VALUES (
     $strasse, $hausnummer, $plz, $ort, $preis, $wohnflaeche, $grundstuecksflaeche,
     $zimmeranzahl, $typ, $baujahr, $beschreibung, $provision, $energieausweis_klasse,
     $energieausweis_verbrauch, $kontakt_name, $kontakt_telefon, $kontakt_email,
-    $expose_nummer, $notizen, $status
+    $expose_nummer, $notizen, $veroeffentlicht, $status
   )
 `);
 

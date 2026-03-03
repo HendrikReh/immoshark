@@ -44,6 +44,22 @@ const NUMERIC_FIELDS = new Set([
   "baujahr",
 ]);
 
+const DATE_FIELDS = new Set(["veroeffentlicht"]);
+
+function parseGermanDate(value: string): string | null {
+  if (!value || value.trim() === "") return null;
+  const trimmed = value.trim();
+  // Already ISO: 2026-01-15
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  // German: 15.01.2026
+  const match = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (match) {
+    const [, day, month, year] = match;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+  return null;
+}
+
 export function importCsvData(
   content: string,
   mapping: CsvColumnMapping
@@ -75,6 +91,8 @@ export function importCsvData(
 
       if (NUMERIC_FIELDS.has(targetField)) {
         rawObj[targetField] = parseGermanNumber(value);
+      } else if (DATE_FIELDS.has(targetField)) {
+        rawObj[targetField] = parseGermanDate(value);
       } else {
         rawObj[targetField] = value;
       }

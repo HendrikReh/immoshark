@@ -67,6 +67,7 @@ export const immobilieCreateSchema = z.object({
   kontakt_email: z.string().email("Ungültige E-Mail").nullable().optional(),
   expose_nummer: z.string().nullable().optional(),
   notizen: z.string().max(500, "Notizen dürfen maximal 500 Zeichen haben").nullable().optional(),
+  veroeffentlicht: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Datum im Format JJJJ-MM-TT").nullable().optional(),
   status: immobilienStatusSchema.optional().default("verfuegbar"),
 });
 
@@ -119,6 +120,7 @@ export const csvColumnMappingSchema = z.record(
       "kontakt_email",
       "expose_nummer",
       "notizen",
+      "veroeffentlicht",
       "status",
     ])
     .nullable()

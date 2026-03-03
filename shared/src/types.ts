@@ -49,6 +49,7 @@ export interface Immobilie {
   kontakt_email: string | null;
   expose_nummer: string | null;
   notizen: string | null;
+  veroeffentlicht: string | null;
   status: ImmobilienStatus;
   erstellt_am: string;
   aktualisiert_am: string;
@@ -83,6 +84,7 @@ export interface ImmobilieCreateDTO {
   kontakt_email?: string | null;
   expose_nummer?: string | null;
   notizen?: string | null;
+  veroeffentlicht?: string | null;
   status?: ImmobilienStatus;
 }
 

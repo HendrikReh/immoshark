@@ -147,7 +147,18 @@ export function ImmobilieForm() {
             />
             <Input label="Energieverbrauch (kWh/m²a)" type="number" value={form.energieausweis_verbrauch ?? ""} onChange={(e) => setNum("energieausweis_verbrauch", e.target.value)} />
           </div>
-          <Input label="Exposé-Nummer" value={form.expose_nummer ?? ""} onChange={(e) => set("expose_nummer", e.target.value || null)} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input label="Exposé-Nummer" value={form.expose_nummer ?? ""} onChange={(e) => set("expose_nummer", e.target.value || null)} />
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Veröffentlicht am</label>
+              <input
+                type="date"
+                value={form.veroeffentlicht ?? ""}
+                onChange={(e) => set("veroeffentlicht", e.target.value || null)}
+                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-shark focus:outline-none focus:ring-1 focus:ring-shark"
+              />
+            </div>
+          </div>
         </fieldset>
 
         <fieldset className="space-y-4">

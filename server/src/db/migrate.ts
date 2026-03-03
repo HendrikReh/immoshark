@@ -23,6 +23,7 @@ export function migrate(db: Database) {
       kontakt_email TEXT,
       expose_nummer TEXT UNIQUE,
       notizen TEXT,
+      veroeffentlicht TEXT,
       status TEXT NOT NULL DEFAULT 'verfuegbar' CHECK(status IN ('verfuegbar','reserviert','verkauft')),
       erstellt_am TEXT NOT NULL DEFAULT (datetime('now')),
       aktualisiert_am TEXT NOT NULL DEFAULT (datetime('now'))
@@ -44,10 +45,13 @@ export function migrate(db: Database) {
     );
   `);
 
-  // Add notizen column if missing (migration for existing DBs)
+  // Add columns if missing (migration for existing DBs)
   const cols = db.query("PRAGMA table_info(immobilien)").all() as { name: string }[];
   if (!cols.some((c) => c.name === "notizen")) {
     db.exec("ALTER TABLE immobilien ADD COLUMN notizen TEXT");
+  }
+  if (!cols.some((c) => c.name === "veroeffentlicht")) {
+    db.exec("ALTER TABLE immobilien ADD COLUMN veroeffentlicht TEXT");
   }
 
   // FTS5: drop and recreate to include all searchable text fields

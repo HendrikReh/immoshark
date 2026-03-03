@@ -39,6 +39,7 @@ export function ImmobilieDetail() {
     { label: "Provision", value: immo.provision || "—" },
     { label: "Energieausweis", value: immo.energieausweis_klasse ? `${immo.energieausweis_klasse} (${immo.energieausweis_verbrauch || "—"} kWh/m²a)` : "—" },
     { label: "Exposé-Nr.", value: immo.expose_nummer || "—" },
+    { label: "Veröffentlicht am", value: immo.veroeffentlicht ? new Date(immo.veroeffentlicht).toLocaleDateString("de-DE") : "—" },
     { label: "Kontakt", value: [immo.kontakt_name, immo.kontakt_telefon, immo.kontakt_email].filter(Boolean).join(" · ") || "—" },
   ];
 
