@@ -47,7 +47,7 @@ ImmoShark richtet sich an Immobilienmakler, die eine schlanke, lokale Lösung zu
 - **Volltextsuche** — Über alle Textfelder suchen (Adressen, Beschreibungen, Kontaktdaten, Notizen, Status u.v.m.)
 - **CRUD-Verwaltung** — Immobilien anlegen, bearbeiten, löschen mit Validierung
 - **Dashboard** — Bestand auf einen Blick: Statistiken, Schnellsuche, letzte Objekte
-- **Filterbare Liste** — Nach Typ, Status, Ort, Preis, Fläche und Zimmerzahl filtern
+- **Filterbare Liste** — Nach Typ, Status, Ort, Preis, Fläche, Zimmerzahl und Datum filtern
 
 ---
 
@@ -55,13 +55,15 @@ ImmoShark richtet sich an Immobilienmakler, die eine schlanke, lokale Lösung zu
 
 | Feature | Beschreibung |
 |---------|-------------|
-| **Sortierbare Spalten** | Alle Tabellenspalten per Klick sortierbar (aufsteigend → absteigend → unsortiert) |
-| **Schieberegler-Filter** | Preis und Zimmeranzahl per Slider oder Direkteingabe filtern |
-| **Such-Button** | Filter werden lokal aufgebaut und erst beim Klick auf „Suchen" oder Enter ausgelöst |
+| **Sortierbare Spalten** | 8 Tabellenspalten per Klick sortierbar (aufsteigend → absteigend → unsortiert), inkl. "Hinzugefügt am" |
+| **Schieberegler-Filter** | Preis, Fläche und Zimmeranzahl per Slider oder Direkteingabe filtern |
+| **Datumsbereich-Filter** | "Hinzugefügt von/bis" mit nativen Datepickern filtern |
+| **Veröffentlichungsdatum** | Optionales Feld pro Objekt: wann wurde die Immobilie im Portal/in der Zeitung veröffentlicht |
+| **Such-Button** | Filter werden lokal aufgebaut und erst beim Klick auf "Suchen" oder Enter ausgelöst |
 | **Notizen** | Freitextfeld (max. 500 Zeichen) für interne Notizen pro Objekt |
 | **Kontakt-Gruppierung** | Objekte nach Ansprechpartner gruppiert anzeigen |
 | **Volltextsuche** | FTS5-Suche über 13 Textfelder + LIKE-Fallback für numerische Felder |
-| **CSV-Import** | 4-Schritt-Wizard: Upload → Spalten-Mapping (mit Auto-Erkennung) → Vorschau → Import |
+| **CSV-Import** | 4-Schritt-Wizard: Upload → Spalten-Mapping (mit Auto-Erkennung) → Vorschau → Import. Erkennt dt. Datumsformat (TT.MM.JJJJ) |
 | **URL-basierte Filter** | Alle Filterparameter in der URL — bookmarkbar, teilbar |
 
 ---
@@ -75,7 +77,7 @@ immoshark/
 ├── shared/          @immoshark/shared — Types, Enums, Zod-Validierung
 ├── server/          @immoshark/server — Express 5 REST-API
 ├── client/          @immoshark/client — React 19 SPA
-└── data/            SQLite-Datenbank + Beispiel-CSV
+└── data/            Beispiel-CSV + Generator-Script
 ```
 
 ### Datenfluss
@@ -93,7 +95,7 @@ Express API (:3002)
     │  Service Layer (raw SQL)
     ▼
 SQLite (WAL-Modus, FTS5)
-    └── data/immoshark.db
+    └── server/immoshark.db
 ```
 
 ### Tech-Stack
@@ -115,6 +117,7 @@ SQLite (WAL-Modus, FTS5)
 - **SQL-Injection-Schutz bei Sortierung** — Sortierbare Spalten werden gegen eine Whitelist validiert, da `ORDER BY`-Spalten nicht über parametrisierte Queries geschützt werden können.
 - **Bilder als separate Tabelle** — Statt JSON-Array in der Immobilien-Tabelle. Ermöglicht Sortierung und zukünftige Erweiterungen.
 - **Additive Migration** — Bestehende Datenbanken werden automatisch erweitert (ALTER TABLE, FTS-Index-Rebuild), ohne Datenverlust.
+- **Deutsches CSV-Format** — Automatische Erkennung von `;` vs. `,` Delimiter, Dezimalkomma-Konvertierung (`1.234,56` → `1234.56`) und deutsches Datumsformat (`TT.MM.JJJJ` → `YYYY-MM-DD`).
 
 ---
 
@@ -167,8 +170,11 @@ cd immoshark
 # 2. Abhängigkeiten installieren
 bun install
 
-# 3. Testdaten laden (6 Beispiel-Immobilien)
+# 3. Testdaten laden (6 Basis-Immobilien)
 bun run seed
+
+# Optional: 500 Testdaten generieren (erzeugt data/beispiel-immobilien.csv)
+bun data/generate-csv.ts
 
 # 4. Entwicklungsserver starten
 bun run dev
@@ -224,6 +230,7 @@ Alle Immobilienobjekte mit Adresse, Kennzahlen, Energieausweis und Kontaktdaten.
 | `kontakt_email` | TEXT | — | E-Mail-Adresse |
 | `expose_nummer` | TEXT | — | Eindeutige Exposé-Nummer (`UNIQUE`) |
 | `notizen` | TEXT | — | Interne Notizen (max. 500 Zeichen) |
+| `veroeffentlicht` | TEXT | — | Veröffentlichungsdatum (ISO `YYYY-MM-DD`). Wann das Objekt im Portal/in der Zeitung veröffentlicht wurde |
 | `status` | TEXT | ja | Objektstatus: `verfuegbar`, `reserviert`, `verkauft` |
 | `erstellt_am` | TEXT | auto | ISO-Timestamp, gesetzt bei INSERT |
 | `aktualisiert_am` | TEXT | auto | ISO-Timestamp, aktualisiert bei UPDATE |
@@ -271,10 +278,11 @@ Virtueller FTS5-Index über 13 Text-Spalten der `immobilien`-Tabelle. Wird autom
 │ kontakt_*            │        │ beschreibung         │
 │ expose_nummer  UQ    │        │ kontakt_name         │
 │ notizen              │        │ kontakt_telefon      │
-│ status               │        │ kontakt_email        │
-│ erstellt_am          │        │ expose_nummer        │
-│ aktualisiert_am      │        │ notizen, provision   │
-└──────────────────────┘        │ typ, status          │
+│ veroeffentlicht      │        │ kontakt_email        │
+│ status               │        │ expose_nummer        │
+│ erstellt_am          │        │ notizen, provision   │
+│ aktualisiert_am      │        │ typ, status          │
+└──────────────────────┘        │                      │
                                 └──────────────────────┘
 ```
 
@@ -308,6 +316,8 @@ Virtueller FTS5-Index über 13 Text-Spalten der `immobilien`-Tabelle. Wird autom
 | `flaeche_max` | number | `?flaeche_max=120` | Höchst-Wohnfläche (m²) |
 | `zimmer_min` | number | `?zimmer_min=2` | Mindest-Zimmeranzahl |
 | `zimmer_max` | number | `?zimmer_max=4` | Höchst-Zimmeranzahl |
+| `erstellt_von` | string | `?erstellt_von=2026-01-01` | Hinzugefügt ab Datum (inklusiv, `YYYY-MM-DD`) |
+| `erstellt_bis` | string | `?erstellt_bis=2026-03-31` | Hinzugefügt bis Datum (inklusiv, `YYYY-MM-DD`) |
 | `sort_by` | enum | `?sort_by=preis` | Sortierung nach Spalte (`strasse`, `typ`, `ort`, `preis`, `wohnflaeche`, `zimmeranzahl`, `status`, `baujahr`, `grundstuecksflaeche`, `kontakt_name`, `erstellt_am`, `aktualisiert_am`) |
 | `sort_order` | enum | `?sort_order=desc` | Sortierrichtung: `asc` (Default) oder `desc` |
 | `gruppe` | enum | `?gruppe=kontakt` | Ergebnisse nach Kontaktperson gruppieren |
@@ -358,7 +368,8 @@ immoshark/
 │   │   └── csv.ts                CSV Upload + Import
 │   ├── services/
 │   │   ├── immobilien.service.ts Datenbank-Queries, Filter, Sortierung, FTS
-│   │   └── csv.service.ts        CSV-Parsing, Delimiter-Detection, Mapping
+│   │   └── csv.service.ts        CSV-Parsing, Delimiter-Detection, Mapping,
+│   │                             dt. Zahlen-/Datumsformat-Konvertierung
 │   └── middleware/
 │       ├── error.ts              Globaler Error-Handler
 │       └── validate.ts           Zod-Validierungs-Middleware
@@ -378,7 +389,8 @@ immoshark/
 │       │                         Toast, RangeSlider
 │       └── lib/utils.ts          Formatierung (Preis, Fläche, Labels)
 └── data/
-    └── beispiel-immobilien.csv   Beispiel-CSV mit deutschen Formaten
+    ├── beispiel-immobilien.csv   500 Beispiel-Immobilien (dt. CSV-Format)
+    └── generate-csv.ts           Generator-Script für realistische Testdaten
 ```
 
 ---
