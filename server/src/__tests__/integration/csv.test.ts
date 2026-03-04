@@ -111,6 +111,17 @@ describe("CSV Import", () => {
     expect(body.error.code).toBe("SESSION_NOT_FOUND");
   });
 
+  it("POST /api/csv/import → 400 for missing session_id (suggest-mapping)", async () => {
+    const res = await fetch(`${baseUrl}/api/csv/suggest-mapping`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: "nonexistent-session" }),
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.code).toBe("SESSION_NOT_FOUND");
+  });
+
   it("POST /api/csv/import → 400 for invalid mapping", async () => {
     // Upload first to get valid session
     const csv = "Col1\nVal1";

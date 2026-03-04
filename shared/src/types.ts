@@ -170,3 +170,8 @@ export interface CsvImportResult {
   skipped: number;
   errors: string[];
 }
+
+export interface CsvMappingSuggestion {
+  mapping: CsvColumnMapping;
+  source: "llm" | "dictionary";
+}

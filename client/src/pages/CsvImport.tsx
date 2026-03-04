@@ -3,6 +3,7 @@ import type { CsvColumnMapping, CsvUploadResult, CsvImportResult, ImmobilieCreat
 import { api } from "../api/client";
 import { Button } from "../components/ui/Button";
 import { Select } from "../components/ui/Select";
+import { getSetting, setSetting } from "../lib/settings";
 
 type Step = "upload" | "mapping" | "preview" | "result";
 
@@ -80,6 +81,8 @@ export function CsvImport() {
   const [importResult, setImportResult] = useState<CsvImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState(() => getSetting("ai_mapping_enabled", true));
+  const [aiLoading, setAiLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function handleFile(file: File) {
@@ -90,8 +93,38 @@ export function CsvImport() {
       setSessionId(res.data.session_id);
       setMapping(autoMap(res.data.headers));
       setStep("mapping");
+
+      // Fire AI mapping in background if enabled
+      if (aiEnabled) {
+        setAiLoading(true);
+        api.suggestMapping(res.data.session_id)
+          .then((aiRes) => {
+            setMapping(aiRes.data.mapping);
+          })
+          .catch(() => {
+            // Silently keep dictionary mapping on AI failure
+          })
+          .finally(() => setAiLoading(false));
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Upload fehlgeschlagen");
+    }
+  }
+
+  function handleAiToggle() {
+    const next = !aiEnabled;
+    setAiEnabled(next);
+    setSetting("ai_mapping_enabled", next);
+
+    // If toggling on and we have a session, trigger AI mapping
+    if (next && sessionId && !aiLoading) {
+      setAiLoading(true);
+      api.suggestMapping(sessionId)
+        .then((aiRes) => {
+          setMapping(aiRes.data.mapping);
+        })
+        .catch(() => {})
+        .finally(() => setAiLoading(false));
     }
   }
 
@@ -183,9 +216,38 @@ export function CsvImport() {
       {/* Step 2: Column Mapping */}
       {step === "mapping" && uploadResult && (
         <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-600">
-            {uploadResult.total_rows} Zeilen erkannt. Ordnen Sie die CSV-Spalten den Datenbankfeldern zu:
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-600">
+              {uploadResult.total_rows} Zeilen erkannt. Ordnen Sie die CSV-Spalten den Datenbankfeldern zu:
+            </p>
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-gray-600">KI-Zuordnung</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={aiEnabled}
+                onClick={handleAiToggle}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                  aiEnabled ? "bg-shark" : "bg-gray-200"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    aiEnabled ? "translate-x-4" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </label>
+          </div>
+          {aiLoading && (
+            <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-4 py-2 text-sm text-blue-700">
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              KI analysiert Spalten...
+            </div>
+          )}
           <div className="space-y-3">
             {uploadResult.headers.map((header) => (
               <div key={header} className="flex items-center gap-4">

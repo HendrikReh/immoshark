@@ -5,6 +5,7 @@ import { ImmobilienListe } from "./pages/ImmobilienListe";
 import { ImmobilieDetail } from "./pages/ImmobilieDetail";
 import { ImmobilieForm } from "./pages/ImmobilieForm";
 import { CsvImport } from "./pages/CsvImport";
+import { Settings } from "./pages/Settings";
 import { NotFound } from "./pages/NotFound";
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/immobilien/:id" element={<ImmobilieDetail />} />
         <Route path="/immobilien/:id/bearbeiten" element={<ImmobilieForm />} />
         <Route path="/csv-import" element={<CsvImport />} />
+        <Route path="/einstellungen" element={<Settings />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

@@ -9,6 +9,7 @@ import type {
   CsvUploadResult,
   CsvColumnMapping,
   CsvImportResult,
+  CsvMappingSuggestion,
 } from "@immoshark/shared";
 
 const BASE = "/api";
@@ -85,6 +86,13 @@ export const api = {
     return request("/csv/import", {
       method: "POST",
       body: JSON.stringify({ session_id: sessionId, mapping }),
+    });
+  },
+
+  suggestMapping(sessionId: string): Promise<ApiResponse<CsvMappingSuggestion>> {
+    return request("/csv/suggest-mapping", {
+      method: "POST",
+      body: JSON.stringify({ session_id: sessionId }),
     });
   },
 };
