@@ -173,6 +173,16 @@ export interface CsvImportResult {
   errors: string[];
 }
 
+export interface CsvImportProfile {
+  id: string;
+  name: string;
+  mapping: CsvColumnMapping;
+  aiEnabled: boolean;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CsvMappingSuggestion {
   mapping: CsvColumnMapping;
   source: "llm" | "dictionary";

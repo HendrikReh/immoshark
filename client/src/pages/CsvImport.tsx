@@ -1,9 +1,12 @@
 import { useState, useRef } from "react";
-import type { CsvColumnMapping, CsvUploadResult, CsvImportResult, ImmobilieCreateDTO } from "@immoshark/shared";
+import type { CsvColumnMapping, CsvUploadResult, CsvImportResult, CsvImportProfile, ImmobilieCreateDTO } from "@immoshark/shared";
 import { api } from "../api/client";
 import { Button } from "../components/ui/Button";
 import { Select } from "../components/ui/Select";
-import { getSetting, setSetting } from "../lib/settings";
+import { Input } from "../components/ui/Input";
+import { Modal } from "../components/ui/Modal";
+import { useToast } from "../components/ui/Toast";
+import { getSetting, setSetting, getProfiles, getDefaultProfile, saveProfile } from "../lib/settings";
 
 type Step = "upload" | "mapping" | "preview" | "result";
 
@@ -85,6 +88,73 @@ export function CsvImport() {
   const [aiEnabled, setAiEnabled] = useState(() => getSetting("ai_mapping_enabled", true));
   const [aiLoading, setAiLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
+  // Profile state
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [saveMode, setSaveMode] = useState<"new" | "overwrite">("new");
+  const [newProfileName, setNewProfileName] = useState("");
+  const [overwriteProfileId, setOverwriteProfileId] = useState<string>("");
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
+
+  function applyProfile(profile: CsvImportProfile, headers: string[]) {
+    const applied: CsvColumnMapping = {};
+    for (const h of headers) {
+      applied[h] = h in profile.mapping ? profile.mapping[h] : null;
+    }
+    setMapping(applied);
+    setAiEnabled(profile.aiEnabled);
+    setSetting("ai_mapping_enabled", profile.aiEnabled);
+    setSelectedProfileId(profile.id);
+  }
+
+  function handleProfileSelect(profileId: string) {
+    if (!profileId || !uploadResult) {
+      setSelectedProfileId(null);
+      return;
+    }
+    const profile = getProfiles().find((p) => p.id === profileId);
+    if (profile) applyProfile(profile, uploadResult.headers);
+  }
+
+  function handleSaveProfile() {
+    const profiles = getProfiles();
+    const now = new Date().toISOString();
+
+    if (saveMode === "new") {
+      if (!newProfileName.trim()) return;
+      const profile: CsvImportProfile = {
+        id: crypto.randomUUID(),
+        name: newProfileName.trim(),
+        mapping: { ...mapping },
+        aiEnabled,
+        isDefault: saveAsDefault,
+        createdAt: now,
+        updatedAt: now,
+      };
+      saveProfile(profile);
+      setSelectedProfileId(profile.id);
+      toast(`Profil "${profile.name}" gespeichert`, "success");
+    } else {
+      const existing = profiles.find((p) => p.id === overwriteProfileId);
+      if (!existing) return;
+      const updated: CsvImportProfile = {
+        ...existing,
+        mapping: { ...mapping },
+        aiEnabled,
+        isDefault: saveAsDefault,
+        updatedAt: now,
+      };
+      saveProfile(updated);
+      setSelectedProfileId(updated.id);
+      toast(`Profil "${updated.name}" aktualisiert`, "success");
+    }
+
+    setSaveModalOpen(false);
+    setNewProfileName("");
+    setSaveAsDefault(false);
+  }
 
   async function handleFile(file: File) {
     setError(null);
@@ -92,11 +162,19 @@ export function CsvImport() {
       const res = await api.uploadCsv(file);
       setUploadResult(res.data);
       setSessionId(res.data.session_id);
-      setMapping(autoMap(res.data.headers));
+
+      // Apply default profile if available, otherwise autoMap
+      const defaultProfile = getDefaultProfile();
+      if (defaultProfile) {
+        applyProfile(defaultProfile, res.data.headers);
+      } else {
+        setMapping(autoMap(res.data.headers));
+        setSelectedProfileId(null);
+      }
       setStep("mapping");
 
-      // Fire AI mapping in background if enabled
-      if (aiEnabled) {
+      // Fire AI mapping in background if enabled (and no default profile was applied)
+      if (!defaultProfile && aiEnabled) {
         setAiLoading(true);
         api.suggestMapping(res.data.session_id)
           .then((aiRes) => {
@@ -217,6 +295,32 @@ export function CsvImport() {
       {/* Step 2: Column Mapping */}
       {step === "mapping" && uploadResult && (
         <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          {/* Profile bar */}
+          <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+            <label className="shrink-0 text-sm font-medium text-gray-700">Profil:</label>
+            <select
+              value={selectedProfileId || ""}
+              onChange={(e) => handleProfileSelect(e.target.value)}
+              className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-shark focus:outline-none focus:ring-1 focus:ring-shark"
+            >
+              <option value="">Kein Profil</option>
+              {getProfiles().map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}{p.isDefault ? " (Standard)" : ""}
+                </option>
+              ))}
+            </select>
+            <Button variant="secondary" onClick={() => {
+              setSaveMode("new");
+              setNewProfileName("");
+              setOverwriteProfileId(getProfiles()[0]?.id || "");
+              setSaveAsDefault(false);
+              setSaveModalOpen(true);
+            }}>
+              Speichern
+            </Button>
+          </div>
+
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-600">
               {uploadResult.total_rows} Zeilen erkannt. Ordnen Sie die CSV-Spalten den Datenbankfeldern zu:
@@ -274,6 +378,87 @@ export function CsvImport() {
           </div>
         </div>
       )}
+
+      {/* Save Profile Modal */}
+      <Modal open={saveModalOpen} onClose={() => setSaveModalOpen(false)} title="Profil speichern">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="saveMode"
+                checked={saveMode === "new"}
+                onChange={() => setSaveMode("new")}
+                className="text-shark focus:ring-shark"
+              />
+              <span className="text-sm font-medium">Neues Profil anlegen</span>
+            </label>
+            {saveMode === "new" && (
+              <div className="ml-6">
+                <Input
+                  placeholder="z.B. Saarland-Format"
+                  value={newProfileName}
+                  onChange={(e) => setNewProfileName(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            )}
+          </div>
+
+          {getProfiles().length > 0 && (
+            <div className="space-y-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="saveMode"
+                  checked={saveMode === "overwrite"}
+                  onChange={() => {
+                    setSaveMode("overwrite");
+                    if (!overwriteProfileId) setOverwriteProfileId(getProfiles()[0]?.id || "");
+                  }}
+                  className="text-shark focus:ring-shark"
+                />
+                <span className="text-sm font-medium">Bestehendes überschreiben</span>
+              </label>
+              {saveMode === "overwrite" && (
+                <div className="ml-6">
+                  <select
+                    value={overwriteProfileId}
+                    onChange={(e) => setOverwriteProfileId(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-shark focus:outline-none focus:ring-1 focus:ring-shark"
+                  >
+                    {getProfiles().map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
+
+          <label className="flex items-center gap-2 border-t border-gray-200 pt-3">
+            <input
+              type="checkbox"
+              checked={saveAsDefault}
+              onChange={(e) => setSaveAsDefault(e.target.checked)}
+              className="rounded text-shark focus:ring-shark"
+            />
+            <span className="text-sm text-gray-700">Als Standard-Profil setzen</span>
+          </label>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setSaveModalOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              onClick={handleSaveProfile}
+              disabled={saveMode === "new" && !newProfileName.trim()}
+            >
+              Speichern
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Step 3: Preview */}
       {step === "preview" && uploadResult && (
