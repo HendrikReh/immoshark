@@ -40,3 +40,7 @@ coverage/
 *.swp
 *.swo
 *~
+
+# Credentials
+.env
+.env.local
